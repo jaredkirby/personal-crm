@@ -1,155 +1,178 @@
-{% extends "web/_atomic/templates/base.html" %} {% load crispy_forms_tags %} {%
-block content %}
-<div class="container mt-4">
-    <h2>{{ object.title }}</h2>
-
-    <!-- Basic Interaction Information -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <p class="card-text">{{ object.description }}</p>
-            <p class="text-muted">Date: {{ object.was_at|date:"F j, Y" }}</p>
-            <p>
-                Contacts: {% for contact in object.contacts.all %}
-                <a
-                    href="{% url 'networking_web:contact-view' contact.id %}"
-                    class="badge badge-primary"
-                >
-                    {{ contact.name }}
-                </a>
-                {% endfor %}
-            </p>
+{% extends "web/_atomic/templates/base.html" %} {% load static %} {% load
+timesince_coarse %} {% block content %}
+<div class="container max-w-4xl mx-auto px-4 py-8">
+    <!-- Interaction Header -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold mb-2">{{ interaction.title }}</h1>
+                <p class="text-gray-600 mb-4">
+                    {{ interaction.was_at|date:"F j, Y g:i A" }}
+                </p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-500">With:</p>
+                <div class="flex gap-2 mt-1">
+                    {% for contact in interaction.contacts.all %}
+                    <a
+                        href="{% url 'networking_web:contact-view' contact.pk %}"
+                        class="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    >
+                        {{ contact.name }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="mt-4 prose max-w-none">
+            {{ interaction.description|linebreaks }}
         </div>
     </div>
 
-    <!-- AI Analysis Section -->
     {% if analysis %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h3 class="card-title">Interaction Analysis</h3>
+    <!-- Sentiment Analysis -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Interaction Sentiment</h2>
+        <div class="mb-4">
+            <div class="w-full bg-gray-200 rounded-full h-4 mb-2">
+                <div
+                    class="h-4 rounded-full transition-all duration-500 {% if sentiment.category == 'positive' %}bg-green-500{% elif sentiment.category == 'negative' %}bg-red-500{% else %}bg-blue-500{% endif %}"
+                    data-sentiment-percentage="{{ sentiment.percentage }}"
+                ></div>
+            </div>
+            <div class="flex justify-between text-sm text-gray-600">
+                <span>Negative</span>
+                <span>Neutral</span>
+                <span>Positive</span>
+            </div>
         </div>
-        <div class="card-body">
-            <!-- Topics -->
-            <h4>Topics Discussed</h4>
-            <ul class="list-group mb-3">
-                {% for topic in analysis.topics_discussed %}
-                <li class="list-group-item">{{ topic }}</li>
-                {% endfor %}
-            </ul>
-
-            <!-- Action Items -->
-            {% if pending_actions %}
-            <h4>Action Items</h4>
-            <ul class="list-group mb-3">
-                {% for action in pending_actions %}
-                <li class="list-group-item">
-                    <div
-                        class="d-flex justify-content-between align-items-center"
-                    >
-                        {{ action.description }} {% if action.due_date %}
-                        <span class="badge badge-info">
-                            Due: {{ action.due_date|date:"M d" }}
-                        </span>
-                        {% endif %}
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% endif %}
-
-            <!-- Key Insights -->
-            <h4>Key Insights</h4>
-            <ul class="list-group mb-3">
-                {% for insight in analysis.key_insights %}
-                <li class="list-group-item">{{ insight }}</li>
-                {% endfor %}
-            </ul>
-
-            <!-- Follow-up Information -->
-            {% if analysis.follow_up_needed %}
-            <div class="alert alert-info">
-                <strong>Follow-up Recommended:</strong>
-                {{ analysis.suggested_follow_up_date|date:"F j, Y" }}
+        {% if needs_attention %}
+        <div class="bg-red-50 border-l-4 border-red-400 p-4 mt-4">
+            <div class="flex">
+                <div class="ml-3">
+                    <p class="text-sm text-red-700">
+                        This interaction may need attention. Consider following up or addressing any concerns raised.
+                    </p>
+                </div>
             </div>
-            {% endif %}
+        </div>
+        {% endif %}
+    </div>
 
-            <!-- Improved Sentiment Indicator -->
-            <div class="sentiment-container mt-3">
-                <h4>Interaction Sentiment</h4>
-                <div class="progress" style="height: 20px">
-                    <div
-                        class="progress-bar sentiment-bar {% if sentiment.category == 'positive' %} bg-success {% elif sentiment.category == 'negative' %} bg-danger {% else %} bg-warning {% endif %}"
-                        role="progressbar"
-                        data-sentiment="{{ sentiment.percentage }}"
-                        aria-valuenow="{{ sentiment.percentage }}"
-                        aria-valuemin="0"
-                        aria-valuemax="100"
-                    >
-                        <span class="sentiment-label"
-                            >{{ sentiment.label }}</span
-                        >
-                    </div>
-                </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Find the sentiment bar element
+            const sentimentBar = document.querySelector('[data-sentiment-percentage]');
+            if (sentimentBar) {
+                // Get the percentage from the data attribute
+                const percentage = sentimentBar.dataset.sentimentPercentage;
+                // Set initial width to 0
+                sentimentBar.style.width = '0%';
+                // Trigger animation after a short delay
+                setTimeout(() => {
+                    sentimentBar.style.width = `${percentage}%`;
+                }, 100);
+            }
+        });
+    </script>
 
-                <div class="sentiment-scale mt-1">
-                    <small class="text-muted">
-                        <span class="float-left">Negative</span>
-                        <span class="float-right">Positive</span>
-                    </small>
-                </div>
-
-                {% if needs_attention %}
-                <div class="alert alert-warning mt-2">
-                    <small>
-                        <i class="fas fa-info-circle"></i>
-                        This interaction might need follow-up attention based on
-                        the sentiment analysis.
-                    </small>
-                </div>
-                {% endif %}
+    <!-- Key Insights -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <h2 class="text-xl font-semibold mb-4">Key Insights</h2>
+        <div class="space-y-4">
+            {% for insight in analysis.key_insights %}
+            <div class="flex items-start">
+                <svg
+                    class="h-6 w-6 text-blue-500 mr-2"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                </svg>
+                <p class="text-gray-700">{{ insight }}</p>
             </div>
-
-            <script>
-                document.addEventListener('DOMContentLoaded', function() {
-                    const progressBar = document.querySelector('.sentiment-bar');
-                    if (progressBar) {
-                        const sentimentValue = progressBar.dataset.sentiment;
-                        progressBar.style.width = sentimentValue + '%';
-                    }
-                });
-            </script>
-
-            <!-- Add the sentiment styling -->
-            <style>
-                .sentiment-container {
-                    position: relative;
-                    margin-bottom: 1rem;
-                }
-
-                .sentiment-bar {
-                    transition: width 0.6s ease;
-                }
-
-                .sentiment-label {
-                    position: absolute;
-                    left: 50%;
-                    transform: translateX(-50%);
-                    color: white;
-                    font-weight: 500;
-                    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
-                    white-space: nowrap;
-                }
-
-                .sentiment-scale {
-                    display: flex;
-                    justify-content: space-between;
-                    padding: 0 0.25rem;
-                }
-            </style>
+            {% endfor %}
         </div>
     </div>
-    {% else %}
-    <div class="alert alert-warning">
-        No analysis is available for this interaction.
+
+    <!-- Action Items -->
+    <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Action Items</h2>
+            {% if analysis.follow_up_needed %}
+            <span
+                class="px-3 py-1 rounded-full text-sm bg-yellow-100 text-yellow-800"
+            >
+                Follow-up needed by {{ analysis.suggested_follow_up_date|date:"M
+                j, Y" }}
+            </span>
+            {% endif %}
+        </div>
+        <div class="space-y-3">
+            {% for action in analysis.action_items %}
+            <div class="flex items-center p-3 bg-gray-50 rounded-lg">
+                <input
+                    type="checkbox"
+                    class="h-4 w-4 text-blue-600 rounded border-gray-300 mr-3"
+                />
+                <span class="text-gray-700">{{ action }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Topics & Context -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-xl font-semibold mb-4">Topics Discussed</h2>
+            <div class="flex flex-wrap gap-2">
+                {% for topic in analysis.topics_discussed %}
+                <span class="px-3 py-1 rounded-full bg-gray-100 text-gray-700">
+                    {{ topic }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-sm p-6">
+            <h2 class="text-xl font-semibold mb-4">Relationship Context</h2>
+            <p class="text-gray-700">{{ analysis.conversation_context }}</p>
+        </div>
+    </div>
+
+    <!-- Personal Information -->
+    {% if analysis.personal_info_mentioned %}
+    <div class="bg-white rounded-lg shadow-sm p-6 mt-6">
+        <h2 class="text-xl font-semibold mb-4">
+            Personal Information Mentioned
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for category, info in analysis.personal_info_mentioned.items %}
+            <div class="flex items-start">
+                <span class="font-medium text-gray-700 mr-2"
+                    >{{ category }}:</span
+                >
+                <span class="text-gray-600">{{ info }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %} {% else %}
+    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div class="flex">
+            <div class="ml-3">
+                <p class="text-sm text-yellow-700">
+                    Analysis for this interaction is not yet available. Check
+                    back soon.
+                </p>
+            </div>
+        </div>
     </div>
     {% endif %}
 </div>
