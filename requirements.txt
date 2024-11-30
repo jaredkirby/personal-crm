@@ -22,3 +22,4 @@ isort==5.13.2  # Import sorting
 mypy==1.8.0  # Type checking
 pytest==8.0.0  # Testing
 pytest-django==4.8.0  # Django test integration
+python-dotenv==1.0.0  # Environment variables
