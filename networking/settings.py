@@ -25,8 +25,28 @@ SECRET_KEY = "$0+b&i$$(%-3pmn45nii!2*l_--8u3+f@6#k@tfa++9cx3&cu0"
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost"]
+ALLOWED_HOSTS = [
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
+]
 
+# These should NEVER be used in production
+if DEBUG:
+    # This allows the error pages to show useful debug information
+    DEBUG_PROPAGATE_EXCEPTIONS = True
+
+    # This allows all hosts while in development
+    # Alternative to specific ALLOWED_HOSTS
+    # ALLOWED_HOSTS = ['*']  # Uncomment this if you prefer allowing all hosts in development
+
+    # Email backend for development - prints emails to console instead of sending
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# You might also want to add these security settings (good practice even in development)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
 # Application definition
 
