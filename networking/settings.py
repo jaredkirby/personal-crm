@@ -61,7 +61,11 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "allauth.account.middleware.AccountMiddleware",
 ]
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 ROOT_URLCONF = "networking.urls"
 
@@ -76,9 +80,10 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-            ]
+                "django.template.context_processors.request",
+            ],
         },
-    }
+    },
 ]
 
 WSGI_APPLICATION = "networking.wsgi.application"
@@ -137,6 +142,7 @@ SITE_ID = 1
 # set redirect after successful login
 LOGIN_REDIRECT_URL = "networking_web:index"
 
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 SOCIALACCOUNT_PROVIDERS = {
