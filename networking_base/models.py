@@ -226,6 +226,37 @@ class InteractionAnalysis(models.Model):
         max_length=50, help_text=_("Version of the analysis model used")
     )
 
+    def get_sentiment_percentage(self) -> float:
+        """
+        Convert the sentiment score (-1 to 1) to a percentage (0 to 100).
+        """
+        if self.sentiment_score is None:
+            return 50.0  # Default to neutral
+        return (self.sentiment_score + 1) * 50
+
+    def get_sentiment_category(self) -> str:
+        """
+        Get a categorical representation of the sentiment.
+        """
+        percentage = self.get_sentiment_percentage()
+        if percentage > 60:
+            return "positive"
+        if percentage < 40:
+            return "negative"
+        return "neutral"
+
+    def get_sentiment_label(self) -> str:
+        """
+        Get a human-readable label for the sentiment.
+        """
+        category = self.get_sentiment_category()
+        labels = {
+            "positive": "Positive",
+            "negative": "Needs Attention",
+            "neutral": "Neutral",
+        }
+        return labels[category]
+
     class Meta:
         verbose_name = _("interaction analysis")
         verbose_name_plural = _("interaction analyses")

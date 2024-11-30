@@ -1,10 +1,18 @@
 from collections import defaultdict
 from datetime import datetime
+from typing import Any, Dict
+
+from django.contrib import messages
+from django.views.generic import CreateView, DetailView
+from django.urls import reverse_lazy
+from .forms import InteractionForm
+from networking_base.models import Interaction, InteractionAnalysis
+from networking_base.signals import AnalysisError
 
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponseRedirect
-from django.shortcuts import render
+from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
+from django.shortcuts import render, redirect
 from django.urls import reverse
 from django.views.generic import (
     CreateView,
@@ -41,7 +49,7 @@ class ContactListView(LoginRequiredMixin, ListView):
     template_name = "web/_atomic/pages/contacts-overview.html"
     ordering = "name"
 
-    def get_context_data(self, *args, **kwargs):
+    def get_context_data(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(*args, **kwargs)
 
         contacts = context["contact_list"]
@@ -80,7 +88,7 @@ class ContactDetailView(LoginRequiredMixin, DetailView):
     model = Contact
     template_name = "web/_atomic/pages/contacts-detail.html"
 
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["interactions"] = context["object"].interactions.order_by("-was_at")
         context["duplicates"] = ContactDuplicate.objects.filter(
@@ -94,7 +102,7 @@ class ContactUpdateView(LoginRequiredMixin, UpdateView):
     fields = CONTACT_FIELDS_DEFAULT
     template_name = "web/_atomic/pages/contacts_form.html"
 
-    def get_success_url(self):
+    def get_success_url(self) -> str:
         return reverse("networking_web:contact-view", kwargs={"pk": self.object.id})
 
 
@@ -103,13 +111,13 @@ class ContactCreateView(LoginRequiredMixin, CreateView):
     fields = CONTACT_FIELDS_DEFAULT
     template_name = "web/_atomic/pages/contacts_form.html"
 
-    def form_valid(self, form):
+    def form_valid(self, form: Any) -> HttpResponse:
         self.object = form.save(commit=False)
         self.object.user_id = self.request.user.id
         self.object.save()
         return HttpResponseRedirect(self.get_success_url())
 
-    def get_success_url(self):
+    def get_success_url(self) -> str:
         return reverse("networking_web:contact-view", kwargs={"pk": self.object.id})
 
 
@@ -117,7 +125,7 @@ class ContactDeleteView(LoginRequiredMixin, DeleteView):
     model = Contact
     template_name = "web/_atomic/pages/contacts_confirm_delete.html"
 
-    def get_success_url(self):
+    def get_success_url(self) -> str:
         success_url = reverse("networking_web:index")
         return success_url
 
@@ -126,10 +134,10 @@ class EmailDeleteView(LoginRequiredMixin, DeleteView):
     model = EmailAddress
     template_name = "web/_atomic/pages/email-confirm-delete.html"
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         return EmailAddress.objects.filter(contact__user=self.request.user)
 
-    def get_success_url(self):
+    def get_success_url(self) -> str:
         return reverse(
             "networking_web:contact-view", kwargs={"pk": self.object.contact_id}
         )
@@ -139,12 +147,12 @@ class EmailListView(LoginRequiredMixin, ListView):
     model = EmailAddress
     template_name = "web/_atomic/pages/contacts-emails-overview.html"
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         return EmailAddress.objects.filter(
             contact_id=self.kwargs["pk"], contact__user=self.request.user
         )
 
-    def get_context_data(self, *args, **kwargs):
+    def get_context_data(self, *args: Any, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["contact"] = Contact.objects.get(
             id=self.kwargs["pk"], user=self.request.user
@@ -156,7 +164,7 @@ class InteractionListView(LoginRequiredMixin, ListView):
     model = Interaction
     template_name = "web/_atomic/pages/interactions-overview.html"
 
-    def get_queryset(self):
+    def get_queryset(self) -> Any:
         return Interaction.objects.filter(
             # owned by user
             user=self.request.user,
@@ -168,29 +176,77 @@ class InteractionListView(LoginRequiredMixin, ListView):
 
 
 class InteractionCreateView(LoginRequiredMixin, CreateView):
+    """
+    Enhanced create view that handles interaction creation and displays
+    analysis status to the user.
+    """
+
     model = Interaction
     form_class = InteractionForm
     template_name = "web/_atomic/pages/interactions-form.html"
+    success_url = reverse_lazy("networking_web:interactions-overview")
 
-    def get_success_url(self):
-        return reverse("networking_web:interactions-overview")
+    def form_valid(self, form: Any) -> HttpResponse:
+        try:
+            # Set the user before saving
+            form.instance.user = self.request.user
 
-    def form_valid(self, form):
-        self.object = form.save(commit=False)
+            # Save the interaction
+            response = super().form_valid(form)
 
-        # set the user id via the request
-        self.object.user_id = self.request.user.id
+            # Set the contacts (needed for many-to-many)
+            self.object.contacts.set(form.cleaned_data["contacts"])
 
-        self.object.save()
+            # Notify user of successful creation and analysis
+            messages.success(self.request, "Interaction saved and analysis initiated.")
 
-        # unclear why this is necessary (many-to-many needs save first?)
-        self.object.contacts.set(form.cleaned_data["contacts"])
+            return response
 
-        return HttpResponseRedirect(self.get_success_url())
+        except AnalysisError as e:
+            # If analysis fails, still save the interaction but notify user
+            messages.warning(
+                self.request, f"Interaction saved but analysis failed: {str(e)}"
+            )
+            return response
+
+        except Exception as e:
+            # Handle any other errors
+            messages.error(self.request, f"Error creating interaction: {str(e)}")
+            return self.form_invalid(form)
+
+
+class InteractionDetailView(LoginRequiredMixin, DetailView):
+    model = Interaction
+    template_name = "web/_atomic/pages/interaction-detail.html"
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+
+        try:
+            analysis = self.object.analysis
+            context["analysis"] = analysis
+
+            # Add sentiment context
+            context["sentiment"] = {
+                "percentage": analysis.get_sentiment_percentage(),
+                "category": analysis.get_sentiment_category(),
+                "label": analysis.get_sentiment_label(),
+            }
+
+            # Add whether this interaction needs attention
+            context["needs_attention"] = analysis.get_sentiment_category() == "negative"
+
+        except InteractionAnalysis.DoesNotExist:
+            context["analysis"] = None
+            messages.info(
+                self.request, "Analysis for this interaction is not available."
+            )
+
+        return context
 
 
 @login_required
-def index(request):
+def index(request: HttpRequest) -> HttpResponse:
     user = request.user
     contacts = get_due_contacts(user)
     contacts_frequent = get_frequent_contacts(user)
@@ -208,7 +264,7 @@ def index(request):
 
 
 @login_required
-def add_touchpoint(request, contact_id):
+def add_touchpoint(request: HttpRequest, contact_id: int) -> HttpResponse:
     contact = Contact.objects.get(pk=contact_id)
     assert contact.user == request.user
     Interaction.objects.create(
@@ -220,6 +276,6 @@ def add_touchpoint(request, contact_id):
     return redirect_back(request)
 
 
-def redirect_back(request):
+def redirect_back(request: HttpRequest) -> HttpResponse:
     referer = request.META.get("HTTP_REFERER")
     return HttpResponseRedirect(referer)

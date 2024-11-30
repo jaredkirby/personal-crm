@@ -1,0 +1,156 @@
+{% extends "web/_atomic/templates/base.html" %} {% load crispy_forms_tags %} {%
+block content %}
+<div class="container mt-4">
+    <h2>{{ object.title }}</h2>
+
+    <!-- Basic Interaction Information -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <p class="card-text">{{ object.description }}</p>
+            <p class="text-muted">Date: {{ object.was_at|date:"F j, Y" }}</p>
+            <p>
+                Contacts: {% for contact in object.contacts.all %}
+                <a
+                    href="{% url 'networking_web:contact-view' contact.id %}"
+                    class="badge badge-primary"
+                >
+                    {{ contact.name }}
+                </a>
+                {% endfor %}
+            </p>
+        </div>
+    </div>
+
+    <!-- AI Analysis Section -->
+    {% if analysis %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Interaction Analysis</h3>
+        </div>
+        <div class="card-body">
+            <!-- Topics -->
+            <h4>Topics Discussed</h4>
+            <ul class="list-group mb-3">
+                {% for topic in analysis.topics_discussed %}
+                <li class="list-group-item">{{ topic }}</li>
+                {% endfor %}
+            </ul>
+
+            <!-- Action Items -->
+            {% if pending_actions %}
+            <h4>Action Items</h4>
+            <ul class="list-group mb-3">
+                {% for action in pending_actions %}
+                <li class="list-group-item">
+                    <div
+                        class="d-flex justify-content-between align-items-center"
+                    >
+                        {{ action.description }} {% if action.due_date %}
+                        <span class="badge badge-info">
+                            Due: {{ action.due_date|date:"M d" }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+
+            <!-- Key Insights -->
+            <h4>Key Insights</h4>
+            <ul class="list-group mb-3">
+                {% for insight in analysis.key_insights %}
+                <li class="list-group-item">{{ insight }}</li>
+                {% endfor %}
+            </ul>
+
+            <!-- Follow-up Information -->
+            {% if analysis.follow_up_needed %}
+            <div class="alert alert-info">
+                <strong>Follow-up Recommended:</strong>
+                {{ analysis.suggested_follow_up_date|date:"F j, Y" }}
+            </div>
+            {% endif %}
+
+            <!-- Improved Sentiment Indicator -->
+            <div class="sentiment-container mt-3">
+                <h4>Interaction Sentiment</h4>
+                <div class="progress" style="height: 20px">
+                    <div
+                        class="progress-bar sentiment-bar {% if sentiment.category == 'positive' %} bg-success {% elif sentiment.category == 'negative' %} bg-danger {% else %} bg-warning {% endif %}"
+                        role="progressbar"
+                        data-sentiment="{{ sentiment.percentage }}"
+                        aria-valuenow="{{ sentiment.percentage }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                    >
+                        <span class="sentiment-label"
+                            >{{ sentiment.label }}</span
+                        >
+                    </div>
+                </div>
+
+                <div class="sentiment-scale mt-1">
+                    <small class="text-muted">
+                        <span class="float-left">Negative</span>
+                        <span class="float-right">Positive</span>
+                    </small>
+                </div>
+
+                {% if needs_attention %}
+                <div class="alert alert-warning mt-2">
+                    <small>
+                        <i class="fas fa-info-circle"></i>
+                        This interaction might need follow-up attention based on
+                        the sentiment analysis.
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const progressBar = document.querySelector('.sentiment-bar');
+                    if (progressBar) {
+                        const sentimentValue = progressBar.dataset.sentiment;
+                        progressBar.style.width = sentimentValue + '%';
+                    }
+                });
+            </script>
+
+            <!-- Add the sentiment styling -->
+            <style>
+                .sentiment-container {
+                    position: relative;
+                    margin-bottom: 1rem;
+                }
+
+                .sentiment-bar {
+                    transition: width 0.6s ease;
+                }
+
+                .sentiment-label {
+                    position: absolute;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    color: white;
+                    font-weight: 500;
+                    text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+                    white-space: nowrap;
+                }
+
+                .sentiment-scale {
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 0 0.25rem;
+                }
+            </style>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-warning">
+        No analysis is available for this interaction.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

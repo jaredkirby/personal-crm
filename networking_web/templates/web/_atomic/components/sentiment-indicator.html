@@ -1,0 +1,87 @@
+<!-- /networking_web/templates/web/_atomic/components/sentiment_indicator.html -->
+
+{% load static %}
+
+<div class="mt-3">
+    <h4>Interaction Sentiment</h4>
+
+    {# Calculate sentiment percentage #} {% with
+    sentiment_percentage=analysis.sentiment_score|add:1|multiply:50 %}
+
+    <div class="sentiment-container">
+        <div class="progress" style="height: 20px">
+            <div
+                class="progress-bar sentiment-bar"
+                role="progressbar"
+                data-sentiment="{{ sentiment_percentage }}"
+                aria-valuenow="{{ sentiment_percentage }}"
+                aria-valuemin="0"
+                aria-valuemax="100"
+            >
+                <span class="sentiment-label">
+                    {% if sentiment_percentage > 60 %} Positive {% elif
+                    sentiment_percentage < 40 %} Needs Attention {% else %}
+                    Neutral {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="sentiment-scale mt-1">
+            <small class="text-muted">
+                <span class="float-left">Negative</span>
+                <span class="float-right">Positive</span>
+            </small>
+        </div>
+    </div>
+
+    <script>
+        // Wait for the DOM to be ready
+        document.addEventListener('DOMContentLoaded', function() {
+            // Find our sentiment bar
+            const sentimentBar = document.querySelector('.sentiment-bar');
+            if (sentimentBar) {
+                // Get the sentiment value from the data attribute
+                const sentimentValue = sentimentBar.dataset.sentiment;
+                // Set the width using JavaScript
+                sentimentBar.style.width = sentimentValue + '%';
+            }
+        });
+    </script>
+
+    {% if sentiment_percentage < 40 %}
+    <div class="alert alert-warning mt-2">
+        <small>
+            <i class="fas fa-info-circle"></i>
+            This interaction might need follow-up attention based on the
+            sentiment analysis.
+        </small>
+    </div>
+    {% endif %} {% endwith %}
+</div>
+
+<style>
+    .sentiment-container {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .sentiment-bar {
+        transition: width 0.6s ease;
+    }
+
+    .sentiment-label {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        font-weight: 500;
+        text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+        white-space: nowrap;
+    }
+
+    .sentiment-scale {
+        display: flex;
+        justify-content: space-between;
+        padding: 0 0.25rem;
+    }
+</style>
