@@ -7,6 +7,7 @@ crispy-bootstrap4==2023.1  # Bootstrap 4 template pack
 # Data Processing and Analysis
 pandas==2.2.0  # For data manipulation
 numpy==1.26.3  # Required by pandas
+anthropic
 
 # Google Integration
 google-api-python-client==2.116.0  # For Google API access
