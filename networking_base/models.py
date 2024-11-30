@@ -5,12 +5,13 @@ from enum import Enum
 from allauth.socialaccount.models import SocialAccount
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import Count
+from django.db.models import Count, Index
 from django.urls import reverse
+from django.utils.translation import gettext_lazy as _
 
-LAST_INTERACTION_DEFAULT = datetime.now().astimezone() - timedelta(days=365)
+LAST_INTERACTION_DEFAULT: datetime = datetime.now().astimezone() - timedelta(days=365)
 
-CONTACT_FREQUENCY_DEFAULT = None
+CONTACT_FREQUENCY_DEFAULT: typing.Optional[int] = None
 
 
 class ContactStatus(Enum):
@@ -24,16 +25,20 @@ class Contact(models.Model):
     A user's contact.
     """
 
-    name = models.CharField(max_length=50)
-    frequency_in_days = models.IntegerField(null=True, blank=True)
-    user = models.ForeignKey(User, models.CASCADE)
+    name: str = models.CharField(max_length=50)
+    frequency_in_days: typing.Optional[int] = models.IntegerField(null=True, blank=True)
+    user: User = models.ForeignKey(User, models.CASCADE)
 
     # contact details
-    description = models.TextField(null=True, blank=True)
-    linkedin_url = models.URLField(max_length=100, null=True, blank=True)
-    twitter_url = models.URLField(max_length=100, null=True, blank=True)
+    description: typing.Optional[str] = models.TextField(null=True, blank=True)
+    linkedin_url: typing.Optional[str] = models.URLField(
+        max_length=100, null=True, blank=True
+    )
+    twitter_url: typing.Optional[str] = models.URLField(
+        max_length=100, null=True, blank=True
+    )
 
-    def get_last_interaction(self) -> "Interaction":
+    def get_last_interaction(self) -> typing.Optional["Interaction"]:
         return self.interactions.order_by("-was_at").first()
 
     def get_last_interaction_date_or_default(self) -> datetime:
@@ -62,7 +67,7 @@ class Contact(models.Model):
         last_interaction_date = self.get_last_interaction_date_or_default()
         return last_interaction_date + timedelta(days=self.frequency_in_days)
 
-    def get_status(self):
+    def get_status(self) -> ContactStatus:
         if not self.frequency_in_days:
             return ContactStatus.HIDDEN
 
@@ -70,10 +75,10 @@ class Contact(models.Model):
             return ContactStatus.OUT_OF_TOUCH
         return ContactStatus.IN_TOUCH
 
-    def get_absolute_url(self):
+    def get_absolute_url(self) -> str:
         return reverse("networking_web:contact-view", kwargs={"pk": self.id})
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -82,9 +87,11 @@ class ContactDuplicate(models.Model):
     A potential duplicate.
     """
 
-    contact = models.ForeignKey(Contact, models.CASCADE, related_name="+")
-    other_contact = models.ForeignKey(Contact, models.CASCADE, related_name="+")
-    similarity = models.FloatField()
+    contact: Contact = models.ForeignKey(Contact, models.CASCADE, related_name="+")
+    other_contact: Contact = models.ForeignKey(
+        Contact, models.CASCADE, related_name="+"
+    )
+    similarity: float = models.FloatField()
 
 
 class EmailAddress(models.Model):
@@ -92,8 +99,10 @@ class EmailAddress(models.Model):
     A contact's email address.
     """
 
-    contact = models.ForeignKey(Contact, models.CASCADE, related_name="email_addresses")
-    email = models.EmailField(max_length=100)
+    contact: Contact = models.ForeignKey(
+        Contact, models.CASCADE, related_name="email_addresses"
+    )
+    email: str = models.EmailField(max_length=100)
 
     class Meta:
         unique_together = ("contact", "email")
@@ -104,8 +113,10 @@ class PhoneNumber(models.Model):
     A contact's phone number.
     """
 
-    contact = models.ForeignKey(Contact, models.CASCADE, related_name="phone_numbers")
-    phone_number = models.CharField(max_length=50)
+    contact: Contact = models.ForeignKey(
+        Contact, models.CASCADE, related_name="phone_numbers"
+    )
+    phone_number: str = models.CharField(max_length=50)
 
 
 class InteractionType(models.Model):
@@ -113,9 +124,9 @@ class InteractionType(models.Model):
     The type of interaction.
     """
 
-    slug = models.SlugField()
-    name = models.CharField(max_length=50)
-    description = models.CharField(max_length=250)
+    slug: str = models.SlugField()
+    name: str = models.CharField(max_length=50)
+    description: str = models.CharField(max_length=250)
 
 
 class Interaction(models.Model):
@@ -123,19 +134,123 @@ class Interaction(models.Model):
     An interaction with a specific contact.
     """
 
-    user = models.ForeignKey(
+    user: User = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="interactions"
     )
-    contacts = models.ManyToManyField(Contact, related_name="interactions")
-    type = models.ForeignKey(InteractionType, models.SET_NULL, blank=True, null=True)
+    contacts: typing.List[Contact] = models.ManyToManyField(
+        Contact, related_name="interactions"
+    )
+    type: typing.Optional[InteractionType] = models.ForeignKey(
+        InteractionType, models.SET_NULL, blank=True, null=True
+    )
 
-    title = models.CharField(max_length=100)
-    description = models.TextField()
-    was_at = models.DateTimeField()
+    title: str = models.CharField(max_length=100)
+    description: str = models.TextField()
+    was_at: datetime = models.DateTimeField()
     # is_outgoing = models.BooleanField()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.user}: {self.title} at {self.was_at}"
+
+
+#
+# Anthropic
+#
+
+
+class InteractionAnalysis(models.Model):
+    """
+    Stores AI-powered analysis of interactions using Claude.
+    This model maintains a one-to-one relationship with Interaction,
+    allowing us to store rich analytical data without cluttering the
+    main Interaction model.
+    """
+
+    # Core relationship - each analysis belongs to exactly one interaction
+    interaction: Interaction = models.OneToOneField(
+        "Interaction",
+        on_delete=models.CASCADE,
+        related_name="analysis",
+        help_text=_("The interaction this analysis belongs to"),
+    )
+
+    # Analysis content
+    topics_discussed: typing.List[str] = models.JSONField(
+        default=list, help_text=_("List of main topics identified in the interaction")
+    )
+
+    action_items: typing.List[str] = models.JSONField(
+        default=list, help_text=_("List of action items extracted from the interaction")
+    )
+
+    key_insights: typing.List[str] = models.JSONField(
+        default=list, help_text=_("Important points and insights from the interaction")
+    )
+
+    sentiment_score: typing.Optional[float] = models.FloatField(
+        null=True, help_text=_("Sentiment score between -1 and 1")
+    )
+
+    follow_up_needed: bool = models.BooleanField(
+        default=False, help_text=_("Indicates if this interaction needs follow-up")
+    )
+
+    suggested_follow_up_date: typing.Optional[datetime] = models.DateTimeField(
+        null=True, blank=True, help_text=_("Recommended date for following up")
+    )
+
+    # Additional context
+    personal_info_mentioned: typing.Dict[str, str] = models.JSONField(
+        default=dict,
+        help_text=_("Personal information mentioned during the interaction"),
+    )
+
+    conversation_context: typing.Optional[str] = models.TextField(
+        null=True,
+        blank=True,
+        help_text=_(
+            "Summary of how this interaction fits into the overall relationship"
+        ),
+    )
+
+    # Metadata
+    created_at: datetime = models.DateTimeField(
+        auto_now_add=True, help_text=_("When this analysis was created")
+    )
+
+    last_updated: datetime = models.DateTimeField(
+        auto_now=True, help_text=_("When this analysis was last updated")
+    )
+
+    analysis_version: str = models.CharField(
+        max_length=50, help_text=_("Version of the analysis model used")
+    )
+
+    class Meta:
+        verbose_name = _("interaction analysis")
+        verbose_name_plural = _("interaction analyses")
+
+        # Add indexes for frequently accessed fields
+        indexes = [
+            # Index for finding analyses by follow-up date
+            models.Index(
+                fields=["suggested_follow_up_date"], name="analysis_followup_idx"
+            ),
+            # Index for filtering by follow-up needed
+            models.Index(
+                fields=["follow_up_needed"], name="analysis_needsfollowup_idx"
+            ),
+            # Composite index for finding analyses within a date range
+            models.Index(
+                fields=["created_at", "last_updated"], name="analysis_dates_idx"
+            ),
+            # Index for sentiment queries
+            models.Index(fields=["sentiment_score"], name="analysis_sentiment_idx"),
+        ]
+
+    def __str__(self) -> str:
+        """String representation of the analysis"""
+        return f"Analysis of {self.interaction} (Created: {self.created_at.date()})"
 
 
 #
@@ -145,31 +260,31 @@ class Interaction(models.Model):
 
 class GoogleEmail(models.Model):
     # link to social account and delete if social account gets deleted
-    social_account = models.ForeignKey(SocialAccount, models.CASCADE)
+    social_account: SocialAccount = models.ForeignKey(SocialAccount, models.CASCADE)
 
     # link to created interaction (if any)
-    interaction = models.ForeignKey(
+    interaction: typing.Optional[Interaction] = models.ForeignKey(
         Interaction, models.SET_NULL, "google_emails", null=True
     )
 
-    gmail_message_id = models.CharField(max_length=100)
-    data = models.JSONField()
+    gmail_message_id: str = models.CharField(max_length=100)
+    data: typing.Dict[str, typing.Any] = models.JSONField()
 
 
 class GoogleCalendarEvent(models.Model):
     # link to social account and delete if social account gets deleted
-    social_account = models.ForeignKey(SocialAccount, models.CASCADE)
+    social_account: SocialAccount = models.ForeignKey(SocialAccount, models.CASCADE)
 
     # link to created interaction (if any)
-    interaction = models.ForeignKey(
+    interaction: typing.Optional[Interaction] = models.ForeignKey(
         Interaction, models.SET_NULL, "google_calendar_events", null=True
     )
 
     # google id
-    google_calendar_id = models.CharField(max_length=100)
+    google_calendar_id: str = models.CharField(max_length=100)
 
     # data
-    data = models.JSONField()
+    data: typing.Dict[str, typing.Any] = models.JSONField()
 
 
 #
@@ -177,7 +292,9 @@ class GoogleCalendarEvent(models.Model):
 #
 
 
-def get_recent_contacts(user, limit=5, timespan_days=14) -> typing.List[Contact]:
+def get_recent_contacts(
+    user: User, limit: int = 5, timespan_days: int = 14
+) -> typing.List[Contact]:
     """
     Fetch contacts recently interacted with.
     :param user: user
@@ -195,7 +312,7 @@ def get_recent_contacts(user, limit=5, timespan_days=14) -> typing.List[Contact]
     return list(contacts_recent)
 
 
-def get_frequent_contacts(user, limit=5) -> typing.List[Contact]:
+def get_frequent_contacts(user: User, limit: int = 5) -> typing.List[Contact]:
     """
     Fetch contacts with frequent interactions.
     :param user: user
@@ -210,7 +327,7 @@ def get_frequent_contacts(user, limit=5) -> typing.List[Contact]:
     return list(contacts_frequent)
 
 
-def get_due_contacts(user) -> typing.List[Contact]:
+def get_due_contacts(user: User) -> typing.List[Contact]:
     """
     Fetch due contacts and sort by urgency (desc).
     :param user: user
@@ -227,7 +344,7 @@ def get_due_contacts(user) -> typing.List[Contact]:
     return list(contacts)
 
 
-def get_or_create_contact_email(email: str, user) -> EmailAddress:
+def get_or_create_contact_email(email: str, user: User) -> EmailAddress:
     """
     Get or create an email address object.
 
@@ -247,7 +364,7 @@ def get_or_create_contact_email(email: str, user) -> EmailAddress:
     return ea
 
 
-def clean_email(email: str):
+def clean_email(email: str) -> str:
     """
     Clean an email address.
     :param email: input
