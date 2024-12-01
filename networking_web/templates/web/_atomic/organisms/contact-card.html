@@ -3,38 +3,39 @@
         <div class="col-md-2 pv-3">
             <a href="{% url 'networking_web:contact-view' contact.id %}">
                 {% load profile %}
-                <img src="{% profile_picture_url contact size=200 %}"
-                     class="img img-fluid rounded-circle mx-auto d-block">
+                <img
+                    src="{% profile_picture_url contact size=200 %}"
+                    class="img img-fluid rounded-circle mx-auto d-block"
+                />
             </a>
         </div>
         <div class="col-md-10">
             <p class="lead mb-0">
-                <a href="{% url 'networking_web:contact-view' contact.id %}" class="text-reset text-decoration-none">
+                <a
+                    href="{% url 'networking_web:contact-view' contact.id %}"
+                    class="text-reset text-decoration-none"
+                >
                     {{ contact.name }}
                 </a>
             </p>
             {% if contact.description %}
-                <p class="mt-0">{{ contact.description }}</p>
+            <p class="mt-0">{{ contact.description }}</p>
             {% endif %}
 
             <div class="row text-center mt-3">
                 <div class="col-sm-4">
                     <small class="text-uppercase text-muted">
-                        Last Interaction
-                    </small><br>
+                        Last Interaction </small
+                    ><br />
                     <div class="badge bg-light text-dark d-block">
-                        {% if contact.get_last_interaction %}
-                            {{ contact.get_last_interaction.was_at|timesince }} ago
-                        {% else %}
-                            -
-                        {% endif %}
+                        {% if contact.get_last_interaction %} {{
+                        contact.get_last_interaction.was_at|timesince }} ago {%
+                        else %} - {% endif %}
                     </div>
                 </div>
                 <div class="col-sm-4">
                     <small class="text-uppercase text-muted">Frequency</small>
-                    <div class="badge bg-light text-dark d-block">
-                        normal
-                    </div>
+                    <div class="badge bg-light text-dark d-block">normal</div>
                 </div>
                 <div class="col-sm-4">
                     <small class="text-uppercase text-muted">Status</small>

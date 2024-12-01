@@ -1,47 +1,49 @@
 <div class="card card-body mb-3">
     <div class="row">
         <div class="col-md-4 mt-1">
-            <div class="text-muted small text-uppercase">
-                Contact(s)
-            </div>
+            <div class="text-muted small text-uppercase">Contact(s)</div>
             <div>
                 {% for contact in interaction.contacts.all|slice:3 %}
-                    <a href="{% url 'networking_web:contact-view' contact.id %}"
-                       class="text-decoration-none">
+                    {# Contact links are outside the main card link for separate clickability #}
+                    <a href="{% url 'networking_web:contact-view' contact.id %}" 
+                        class="text-decoration-none position-relative"
+                        style="z-index: 2;"
+                        title="View {{ contact.name }}'s profile">
                         {{ contact.name }}
-                    </a><br>
+                    </a>
+                    {% if not forloop.last %}<br>{% endif %}
                 {% endfor %}
                 {% if interaction.contacts.all|length > 3 %}
-                    and {{ interaction.contacts.all|slice:'3:'|length }} others...
+                    <br>
+                    <span class="text-muted">
+                        and {{ interaction.contacts.all|slice:'3:'|length }} others...
+                    </span>
                 {% endif %}
             </div>
         </div>
         <div class="col-md-4 mt-1">
-            <div class="text-muted small text-uppercase">
-                Interaction
-            </div>
-            <div>
-                {{ interaction.title }}
-            </div>
+            <div class="text-muted small text-uppercase">Interaction</div>
+            <div>{{ interaction.title }}</div>
         </div>
         <div class="col-md-4 mt-1">
-            <div class="text-muted small text-uppercase">
-                When
-            </div>
+            <div class="text-muted small text-uppercase">When</div>
             <div>
                 {{ interaction.was_at|date }}<br>
-                {{ interaction.was_at|timesince }} ago
+                <span class="text-muted">{{ interaction.was_at|timesince }} ago</span>
             </div>
         </div>
     </div>
     {% if show_description %}
         <div class="mt-3">
-            <div class="text-muted small text-uppercase">
-                Description
-            </div>
-            <div>
-                {{ interaction.description }}
-            </div>
+            <div class="text-muted small text-uppercase">Description</div>
+            <div>{{ interaction.description }}</div>
         </div>
     {% endif %}
+    
+    {# Main card link using Bootstrap's stretched-link #}
+    <a href="{% url 'networking_web:interactions-detail' interaction.pk %}" 
+        class="stretched-link"
+        title="View interaction details">
+        <span class="visually-hidden">View details for {{ interaction.title }}</span>
+    </a>
 </div>

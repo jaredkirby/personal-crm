@@ -9,11 +9,11 @@
             <td>
                 {% load profile %}
                 <img src="{% profile_picture_url contact %}"
-                     class="img img-fluid rounded-circle" height="50px" width="50px">
+                    class="img img-fluid rounded-circle" height="50px" width="50px">
             </td>
             <td>
                 <a href="{% url "networking_web:contact-view" contact.id %}"
-                   class="text-decoration-none text-reset">
+                    class="text-decoration-none text-reset">
                     {{ contact.name|truncatechars:50 }}
                 </a>
             </td>
