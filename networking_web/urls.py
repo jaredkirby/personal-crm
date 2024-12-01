@@ -17,6 +17,11 @@ urlpatterns = [
         views.InteractionCreateView.as_view(),
         name="interaction-create",
     ),
+    path(
+        "interactions/<int:pk>",
+        views.InteractionDetailView.as_view(),
+        name="interactions-detail",
+    ),
     # contacts
     path("contacts", views.ContactListView.as_view(), name="contact-overview"),
     path("contacts/create", views.ContactCreateView.as_view(), name="contact-create"),

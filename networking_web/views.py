@@ -2,18 +2,13 @@ from collections import defaultdict
 from datetime import datetime
 from typing import Any, Dict
 
+# Django imports - group by functionality
 from django.contrib import messages
-from django.views.generic import CreateView, DetailView
-from django.urls import reverse_lazy
-from .forms import InteractionForm
-from networking_base.models import Interaction, InteractionAnalysis
-from networking_base.signals import AnalysisError
-
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponseRedirect, HttpRequest, HttpResponse
 from django.shortcuts import render, redirect
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -23,18 +18,22 @@ from django.views.generic import (
 )
 from pytz import UTC
 
+# Local imports - group by module
+from networking_base.errors import AnalysisError  # Import from new location
 from networking_base.models import (
     Contact,
     ContactDuplicate,
     ContactStatus,
     EmailAddress,
     Interaction,
+    InteractionAnalysis,
     get_due_contacts,
     get_frequent_contacts,
     get_recent_contacts,
 )
-from networking_web.forms import InteractionForm
+from .forms import InteractionForm
 
+# Constants
 CONTACT_FIELDS_DEFAULT = [
     "name",
     "frequency_in_days",
@@ -177,8 +176,11 @@ class InteractionListView(LoginRequiredMixin, ListView):
 
 class InteractionCreateView(LoginRequiredMixin, CreateView):
     """
-    Enhanced create view that handles interaction creation and displays
-    analysis status to the user.
+    Handles creation of new interactions with automatic analysis.
+
+    This view manages both the basic interaction creation and triggers
+    the asynchronous analysis process. It provides detailed feedback
+    to users about the success or failure of both operations.
     """
 
     model = Interaction
@@ -186,38 +188,59 @@ class InteractionCreateView(LoginRequiredMixin, CreateView):
     template_name = "web/_atomic/pages/interactions-form.html"
     success_url = reverse_lazy("networking_web:interactions-overview")
 
-    def form_valid(self, form: Any) -> HttpResponse:
+    def form_valid(self, form):
+        """
+        Handle form submission with proper error handling and object lifecycle management.
+
+        This method:
+        1. Saves the basic interaction data
+        2. Associates the interaction with contacts
+        3. Triggers the analysis process
+        4. Provides appropriate feedback to the user
+        """
         try:
-            # Set the user before saving
-            form.instance.user = self.request.user
+            # First save the interaction
+            self.object = form.save(commit=False)
+            self.object.user = self.request.user
+            self.object.save()
 
-            # Save the interaction
-            response = super().form_valid(form)
+            # Now save the many-to-many data
+            form.save_m2m()
 
-            # Set the contacts (needed for many-to-many)
-            self.object.contacts.set(form.cleaned_data["contacts"])
+            messages.success(
+                self.request,
+                "Interaction saved successfully. Analysis will be available shortly.",
+            )
 
-            # Notify user of successful creation and analysis
-            messages.success(self.request, "Interaction saved and analysis initiated.")
-
-            return response
+            return HttpResponseRedirect(self.get_success_url())
 
         except AnalysisError as e:
-            # If analysis fails, still save the interaction but notify user
+            # Handle analysis-specific errors
             messages.warning(
-                self.request, f"Interaction saved but analysis failed: {str(e)}"
+                self.request, f"Interaction saved but analysis failed: {e.message}"
             )
-            return response
+            return HttpResponseRedirect(self.get_success_url())
 
         except Exception as e:
-            # Handle any other errors
-            messages.error(self.request, f"Error creating interaction: {str(e)}")
+            # Handle any other unexpected errors
+            messages.error(self.request, f"Error saving interaction: {str(e)}")
             return self.form_invalid(form)
+
+    def get_success_url(self):
+        """
+        Determine where to redirect after successful interaction creation.
+
+        Returns:
+            str: URL to redirect to after processing
+        """
+        if self.object and self.object.pk:
+            return reverse("networking_web:interactions-overview")
+        return str(self.success_url)
 
 
 class InteractionDetailView(LoginRequiredMixin, DetailView):
     model = Interaction
-    template_name = "web/_atomic/pages/interaction-detail.html"
+    template_name = "web/_atomic/pages/interactions-detail.html"
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)

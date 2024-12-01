@@ -43,15 +43,16 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.sites",  # required by allauth
+    "django.contrib.sites",
     # Third-party apps
+    "crispy_bootstrap4",  # Add this line BEFORE crispy_forms
     "crispy_forms",
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
     "allauth.socialaccount.providers.google",
     # Local apps
-    "networking_public",  # Must be before allauth for template precedence
+    "networking_public",
     "networking_base",
     "networking_web",
 ]
